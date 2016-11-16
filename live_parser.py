@@ -1,13 +1,15 @@
 # coding: utf-8
 
 # In[207]:
-import os
-from os import listdir
-from os.path import isfile, join, expanduser
-import re
 import csv
 import json
+import os
+import re
+from os import listdir
+from os.path import isfile, join, expanduser
+
 from pymongo import MongoClient
+from titlecase import titlecase
 
 mypath = expanduser('~') + '/Dropbox/streamsavvy_live_data'
 mypath
@@ -19,9 +21,11 @@ csvz = [s for s in onlyfiles if re.search('csv', s)]
 
 def servmatch(s):
     if 'sling' in s:
-        return 'sling'
+        return 'Sling'
     if 'vue' in s:
-        return 'playstation vue'
+        return 'Playstation Vue'
+    if 'espn' in s:
+        return "Watch ESPN"
 
 
 for f in csvz:
@@ -93,27 +97,75 @@ parsed = urlparse(url)
 noti_file = open(join(mypath, 'live_notification_content.json'))
 notices = json.load(noti_file)
 
+link_file = open(join(mypath, 'live_service_deeplinks.json'))
+links = json.load(link_file)
+
 # result = db.notifications.insert_many(notices)
 
 # In[231]:
 
+x = [d for d in notices if d['app_name'] == 'single_tier'][0]
+
+slist = x["service_name"].split(" ")
+
+def make_notice (n, s):
+    n["service_name"] = s
+    n["app"] = titlecase(s)
+
+    return n
+
+newlist = [make_notice(x, s) for s in slist]
+
+notices += newlist
+
 for chan in chans:
     for serv in chan["services"]:
-        for notice in notices:
-            if serv['service'] in notice["versions"]:
-                serv["template"] = notice
+        serv["link"] = ""
 
+        if re.match(r"ps_vue", serv["service"]):
+            serv["app_identifier"] = "ps_vue"
+
+        elif re.match(r"sling", serv["service"]):
+            serv["app_identifier"] = "sling"
+
+        else:
+            serv["app_identifier"] = serv["service"]
+
+        for notice in notices:
+            if serv['service'] in notice["versions"] :
+                serv["template"] = notice
+                if serv['app'] == "":
+                    serv['app'] = titlecase(notice['app_name'])
+
+
+
+            elif notice["app_name"] == 'single_tier':
+                serv["template"] = notice
+                if serv['app'] == "":
+                    serv['app'] = titlecase(notice['app_name'])
+                    print(serv['app'])
+
+        for link in links:
+
+            link_re = re.compile(link["app_name"], flags=re.I)
+            if serv["app"] and link_re.match(serv["app"]):
+                serv["link"] = link
+            elif serv["app"] == "Playstation Vue" and link["app_name"] == 'ps_vue':
+                serv["link"] = link
+            elif serv["app"] == 'Watch ESPN' and link["app_name"] == 'watchespn':
+                serv["link"] = link
+            elif serv["service"] == 'cbs_all_access' and link['app_name'] == 'cbs_all_access':
+                serv["link"] = link
 
 fp = open('result.json', 'w')
 json.dump(chans, fp)
 fp.close()
 
-
-
-
 from urllib.parse import urlparse
 
-url = os.environ["MONGODB_URI"]
+# url = os.environ["MONGODB_URI"]
+url = os.environ["REMOTE"]
+# url = os.environ["concur"]
 parsed = urlparse(url)
 
 # In[233]:
@@ -126,5 +178,4 @@ collection.remove()
 
 result = collection.insert_many(chans)
 
-
-print(result.inserted_ids)
+print(len(result.inserted_ids))
