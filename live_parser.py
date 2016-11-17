@@ -104,19 +104,48 @@ links = json.load(link_file)
 
 # In[231]:
 
-x = [d for d in notices if d['app_name'] == 'single_tier'][0]
+y = None
 
-slist = x["service_name"].split(" ")
+x = None
 
-def make_notice (n, s):
+for i in notices:
+    if i['app_name'] == 'single_tier':
+        x = i
+    if i['app_name'] == 'sling_extra':
+        y = i
+
+#
+s_list = x["service_name"].split(" ")
+
+ex_list = y["versions"].split(" ")
+#
+def make_single_tier_notice  (n, s):
     n["service_name"] = s
-    n["app"] = titlecase(s)
+    n["app"] = titlecase(" ".join(s.split("_")).replace("Hbo", "HBO"))
+    n["app_name"] = s
 
     return n
 
-newlist = [make_notice(x, s) for s in slist]
+s_list = [make_single_tier_notice (dict(x), s) for s in s_list]
 
-notices += newlist
+
+def make_sling_extra_notice(param, e):
+    param["version"] = e
+    param["versions"] = e
+    param["app"] = titlecase(" ".join(e.split("_")))
+    param['service_name'] = e
+    param["app_identifier"] = "sling"
+    return param
+
+
+ex_list =[make_sling_extra_notice (dict(y), e ) for e in ex_list]
+
+s_list += ex_list
+notices += s_list
+
+with open('mNotice.json', 'w') as f:
+    json.dump(notices,f)
+
 
 for chan in chans:
     for serv in chan["services"]:
@@ -131,6 +160,12 @@ for chan in chans:
         else:
             serv["app_identifier"] = serv["service"]
 
+        if not serv["app"] :
+            serv["app"] = titlecase(" ".join(serv["app_identifier"].split("_")))
+            serv["app"] = serv["app"].replace("Tv", "TV")
+            serv["app"] = serv["app"].replace("Hbo", "HBO")
+            serv["app"] = serv["app"].replace("Cbs", "CBS")
+
         for notice in notices:
             if serv['service'] in notice["versions"] :
                 serv["template"] = notice
@@ -139,7 +174,7 @@ for chan in chans:
 
 
 
-            elif notice["app_name"] == 'single_tier':
+            elif serv['service'] == notice["service_name"]:
                 serv["template"] = notice
                 if serv['app'] == "":
                     serv['app'] = titlecase(notice['app_name'])
@@ -178,4 +213,5 @@ collection.remove()
 
 result = collection.insert_many(chans)
 
-print(len(result.inserted_ids))
+print(result.inserted_ids)
+
