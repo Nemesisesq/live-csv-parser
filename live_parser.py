@@ -8,47 +8,18 @@ import re
 from os import listdir
 from os.path import isfile, join, expanduser
 
+from fuzzywuzzy import fuzz
 from pymongo import MongoClient
 from titlecase import titlecase
 
+from convert_csc_to_json import X
+
 mypath = expanduser('~') + '/Dropbox/streamsavvy_live_data'
-mypath
 
-onlyfiles = [join(mypath, f) for f in listdir(mypath) if isfile(join(mypath, f))]
-
-csvz = [s for s in onlyfiles if re.search('csv', s)]
-
-
-def servmatch(s):
-    if 'sling' in s:
-        return 'Sling'
-    if 'vue' in s:
-        return 'Playstation Vue'
-    if 'espn' in s:
-        return "Watch ESPN"
-
-
-for f in csvz:
-    with open(f, newline='') as csvfile:
-        print(f)
-        r = csv.DictReader(csvfile)
-        l = [s for s in r]
-
-        j = f.replace('csv', 'json')
-
-        try:
-            for x in l:
-                if 'services' in x:
-                    x['services'] = [r for r in x["services"].split(' ') if r]
-
-                    x['services'] = [{"service": r, "app": servmatch(r)} for r in x['services']]
-        except Exception as e:
-            print(e)
-
-        with open(j, 'w') as json_file:
-            json.dump(l, json_file)
 
 # In[208]:
+
+X().convert_files()
 
 price_file = open(join(mypath, 'service_prices.json'))
 prices = json.load(price_file)
@@ -65,6 +36,8 @@ for c in chans:
                 s['price'] = p
 
 # In[210]:
+chans
+
 
 final_file = open('final_file.json', 'w')
 json.dump(chans, final_file)
@@ -76,7 +49,7 @@ url = 'mongodb://heroku_7c4hfzsn:f1crnk27vi7l6uaetdvfhgriop@ds139665.mlab.com:39
 from urllib.parse import urlparse
 
 parsed = urlparse(url)
-
+parsed
 # In[233]:
 
 # client = MongoClient(url)
@@ -119,15 +92,16 @@ s_list = x["service_name"].split(" ")
 
 ex_list = y["versions"].split(" ")
 #
-def make_single_tier_notice  (n, s):
+def make_single_tier_notice(n, s):
     n["service_name"] = s
     n["app"] = titlecase(" ".join(s.split("_")).replace("Hbo", "HBO"))
     n["app_name"] = s
 
     return n
 
-s_list = [make_single_tier_notice (dict(x), s) for s in s_list]
+s_list = [make_single_tier_notice(dict(x), s) for s in s_list]
 
+s_list
 
 def make_sling_extra_notice(param, e):
     param["version"] = e
@@ -139,6 +113,8 @@ def make_sling_extra_notice(param, e):
 
 
 ex_list =[make_sling_extra_notice (dict(y), e ) for e in ex_list]
+
+ex_list
 
 s_list += ex_list
 notices += s_list
@@ -190,6 +166,8 @@ for chan in chans:
             elif serv["app"] == 'Watch ESPN' and link["app_name"] == 'watchespn':
                 serv["link"] = link
             elif serv["service"] == 'cbs_all_access' and link['app_name'] == 'cbs_all_access':
+                serv["link"] = link
+            elif fuzz.partial_ratio(serv["app_identifier"], link["app_name"]) > 90:
                 serv["link"] = link
 
 fp = open('result.json', 'w')
